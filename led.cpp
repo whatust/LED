@@ -37,7 +37,7 @@ void addConst(uint8_t *text, int round){
 	return;
 }
 
-void subCell(uint8_t *text){
+void subCell(uint8_t *text, uint8_t *s){
 
 	uint8_t b;
 	uint8_t n1, n2;
@@ -48,37 +48,61 @@ void subCell(uint8_t *text){
 		n2 = b & MASK_LOW;
 
 		if(n1%2)
-			text[i] = (MASK_LOW & SBOX[n1/2]) << 4;
+			text[i] = (MASK_LOW & s[n1/2]) << 4;
 		else
-			text[i] = MASK_HIGH & SBOX[n1/2];
+			text[i] = MASK_HIGH & s[n1/2];
 
 		if(n2%2)
-			text[i] |= MASK_LOW & SBOX[n2/2];
+			text[i] |= MASK_LOW & s[n2/2];
 		else
-			text[i] |= (MASK_HIGH & SBOX[n2/2]) >> 4;
+			text[i] |= (MASK_HIGH & s[n2/2]) >> 4;
 	}
 
 	return;
 }
 
-void shiftRow(uint8_t *text){
-
-	uint16_t r;
+uint16_t shift(uint16_t r, int i){
+	
 	uint16_t s;
 
+	s = r >> 4*(4-i);
+	r <<= 4*i;
+	r |= s;
+
+	return r;
+}
+
+void shiftRow(uint8_t *t){
+
+	uint16_t r;
+
 	for(int i=1; i<4; ++i){
-		
-		r = text[2*i] << 8;
-		r |= text[2*i+1];
 
-		s = r >> 4*(4-i);
+		r = t[2*i] << 8;
+		r |= t[2*i+1];
 
-		r <<= 4*i;
+		r = shift(r, i);
 
-		r |= s;
+		t[2*i] = (r & MASK_BH) >> 8;
+		t[2*i+1] = r & MASK_BL;
+	}
 
-		text[2*i] = (r & MASK_BH) >> 8;
-		text[2*i+1] = r & MASK_BL;
+	return;
+}
+
+void rshiftRow(uint8_t *t){
+
+	uint16_t r;
+
+	for(int i=1; i<4; ++i){
+
+		r = t[2*i] << 8;
+		r |= t[2*i+1];
+
+		r = shift(r, 4-i);
+
+		t[2*i] = (r & MASK_BH) >> 8;
+		t[2*i+1] = r & MASK_BL;
 	}
 
 	return;
@@ -87,16 +111,22 @@ void shiftRow(uint8_t *text){
 uint8_t multGF(uint8_t m, uint8_t a){
 
 	switch(m){
+		case 0x00:
+			return 0;
 		case 0x01:
 			return a;
 		case 0x02:
 			return MULT2[a];
+		case 0x03:
+			return MULT2[a]^a;
 		case 0x04:
 			return MULT2[MULT2[a]];
 		case 0x05:
 			return MULT2[MULT2[a]]^a;
 		case 0x06:
 			return MULT2[MULT2[a]^a];
+		case 0x07:
+			return MULT2[MULT2[a]]^MULT2[a]^a;
 		case 0x08:
 			return MULT2[MULT2[MULT2[a]]];
 		case 0x09:
@@ -105,6 +135,10 @@ uint8_t multGF(uint8_t m, uint8_t a){
 			return MULT2[MULT2[MULT2[a]]^a];
 		case 0x0b:
 			return MULT2[MULT2[MULT2[a]]^a]^a;
+		case 0x0c:
+			return MULT2[MULT2[MULT2[a]^a]];
+		case 0x0d:
+			return MULT2[MULT2[MULT2[a]^a]]^a; 
 		case 0x0e:
 			return MULT2[MULT2[MULT2[a]]^MULT2[a]^a];
 		case 0x0f:
@@ -113,10 +147,9 @@ uint8_t multGF(uint8_t m, uint8_t a){
 			cerr << "m Unexpected m value: " << ios::hex << static_cast<int>(m) << endl;
 			exit(1);
 	}
-
 }
 
-void mixColumn(uint8_t *text){
+void mixColumn(uint8_t *text, uint8_t *m){
 
 	uint8_t copy_text[8];
 	uint8_t t_low, t_hi;
@@ -136,8 +169,8 @@ void mixColumn(uint8_t *text){
 			//Col M
 			for(int j=0; j<2; ++j){
 				
-				m_low = MASK_LOW & MIXCOL[(2*i)+j];
-				m_hi = MIXCOL[(2*i)+j]>>4;
+				m_low = MASK_LOW & m[(2*i)+j];
+				m_hi = m[(2*i)+j]>>4;
 
 				if(k%2){
 					t_hi = MASK_LOW & copy_text[4*j+k/2];
@@ -167,7 +200,7 @@ void step(uint8_t *text, int round){
 		//cout << "addConst" << endl;
 		//printBlock(text);
 
-		subCell(text);
+		subCell(text, SBOX);
 		//cout << "SubCell" << endl;
 		//printBlock(text);
 
@@ -175,9 +208,33 @@ void step(uint8_t *text, int round){
 		//cout << "shiftRow" << endl;
 		//printBlock(text);
 
-		mixColumn(text);
+		mixColumn(text, MIXCOL);
 		//cout << "mixColumn" << endl;
 		//printBlock(text);
+	}
+
+	return;
+}
+
+void rstep(uint8_t *text, int round){
+	
+	for(int r=0; r<4; ++r){
+		mixColumn(text, INV_MIXCOL);
+		//cout << "mixColumn" << endl;
+		//printBlock(text);
+
+		rshiftRow(text);
+		//cout << "shiftRow" << endl;
+		//printBlock(text);
+
+		subCell(text, INV_SBOX);
+		//cout << "SubCell" << endl;
+		//printBlock(text);
+
+		addConst(text, 31-(4*round+r));
+		//cout << "addConst" << endl;
+		//printBlock(text);
+
 	}
 
 	return;
@@ -214,9 +271,9 @@ void decryptBlock(uint8_t *text, uint8_t *key){
 	clock_t time; 
 	time = clock();
 
-	for(int s=0; s < 7; ++s){
+	for(int s=0; s < 8; ++s){
 		addKey(text, key);
-		//srtep(text, s);
+		rstep(text, s);
 	}
 	addKey(text, key);
 
@@ -224,4 +281,84 @@ void decryptBlock(uint8_t *text, uint8_t *key){
 	cout << "clicks: " <<(double) time << endl;
 
 	return;
+}
+
+void testComp(){
+
+		uint64_t shift = 0x0123456789abcdef;
+		uint8_t * shift_array;
+
+		shift_array = utin64touint8(shift);
+		cout << "Shift Test:" << endl;
+		printBlock(shift_array);
+		cout << "Shift Result:" << endl;
+		shiftRow(shift_array);
+		printBlock(shift_array);
+		delete [] shift_array;
+
+		uint64_t rshift = 0x01235674ab89fcde;
+		uint8_t * rshift_array;
+
+		rshift_array = utin64touint8(rshift);
+		cout << "rShift Test:" << endl;
+		printBlock(rshift_array);
+		cout << "rShift Result:" << endl;
+		rshiftRow(rshift_array);
+		printBlock(rshift_array);
+		delete [] rshift_array;
+
+		uint64_t addcon = 0x0000000000000000;
+		uint8_t *addcon_array;
+
+		addcon_array = utin64touint8(addcon);
+		cout << endl << "Add Constante Test:" << endl;
+		printBlock(addcon_array);
+		cout << "Add Constante Result:" << endl;
+		addConst(addcon_array,4);
+		printBlock(addcon_array);
+		delete [] addcon_array;
+
+		uint64_t sub = 0x0123456789abcdef;
+		uint8_t * sub_array;
+
+		sub_array = utin64touint8(sub);
+		cout << endl << "Sub Test:" << endl;
+		printBlock(sub_array);
+		cout << "Sub Result:" << endl;
+		subCell(sub_array, SBOX);
+		printBlock(sub_array);
+		delete [] sub_array;
+
+		uint64_t rsub = 0xc56b90ad3ef84712;
+		uint8_t *rsub_array;
+
+		rsub_array = utin64touint8(rsub);
+		cout << "rSub Test:" << endl;
+		printBlock(rsub_array);
+		cout << "rSub Result:" << endl;
+		subCell(rsub_array, INV_SBOX);
+		printBlock(rsub_array);
+		delete [] rsub_array;
+
+		uint64_t mix = 0xccd43845762ed99d;
+		uint8_t *mix_array;
+
+		mix_array = utin64touint8(mix);
+		cout << endl << "Mix Test:" << endl;
+		printBlock(mix_array);
+		cout << "Mix Result:" << endl;
+		mixColumn(mix_array, MIXCOL);
+		printBlock(mix_array);
+		delete [] mix_array;
+
+		uint64_t rmix = 0x41228656bea922fb;
+		uint8_t *rmix_array;
+
+		rmix_array = utin64touint8(rmix);
+		cout << "rMix Test:" << endl;
+		printBlock(rmix_array);
+		cout << "rMix Result:" << endl;
+		mixColumn(rmix_array, INV_MIXCOL);
+		printBlock(rmix_array);
+		delete [] rmix_array;
 }

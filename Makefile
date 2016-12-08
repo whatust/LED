@@ -9,6 +9,9 @@ test:
 	echo "e 0 0\n" | ./led
 	echo "e 0123456789abcdef 0123456789abcdef\n" | ./led
 
+	echo "d 39c2401003a0c798 0\n" | ./led
+	echo "d a003551e3893fc58 0123456789abcdef\n" | ./led
+
 test_comp: build
 	echo "t\n" | ./led
 
