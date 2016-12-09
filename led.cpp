@@ -249,10 +249,10 @@ void addKey(uint8_t *text, uint8_t *key){
 	return;
 }
 
-void encryptBlock(uint8_t *text, uint8_t *key){
+double encryptBlock(uint8_t *text, uint8_t *key){
 
-	clock_t time; 
-	time = clock();
+	double c;
+	c = click();
 
 	for(int s=0; s < 8; ++s){
 		addKey(text, key);
@@ -260,16 +260,18 @@ void encryptBlock(uint8_t *text, uint8_t *key){
 	}
 	addKey(text, key);
 
-	time = clock()-time;
-	cout << "clicks: " <<(double) time << endl;
+	c = click()-c;
+	//cout << "clocks: " << (double) c << endl;
 
-	return;
+	return c;
 }
 
-void decryptBlock(uint8_t *text, uint8_t *key){
+double decryptBlock(uint8_t *text, uint8_t *key){
 
 	clock_t time; 
+	double c;
 	time = clock();
+	c = click();
 
 	for(int s=0; s < 8; ++s){
 		addKey(text, key);
@@ -277,88 +279,116 @@ void decryptBlock(uint8_t *text, uint8_t *key){
 	}
 	addKey(text, key);
 
+	c = click()-c;
 	time = clock()-time;
-	cout << "clicks: " <<(double) time << endl;
+	//cout << "clocks: " << (double) c << endl;
+
+	return c;
+}
+
+void testTime(){
+
+	double sumEncTime=0.0;
+	double sumDecTime=0.0;
+
+	uint64_t t, k;
+	uint8_t *t_array;
+	uint8_t *k_array;
+
+	for(int i=0; i<NSAMPLES; ++i){
+
+		syscall(SYS_getrandom, &t, 8, GRND_NONBLOCK);
+		syscall(SYS_getrandom, &k, 8, GRND_NONBLOCK);
+
+		t_array = utin64touint8(t);
+		k_array = utin64touint8(k);
+
+		sumEncTime += encryptBlock(t_array, k_array);
+		sumDecTime += decryptBlock(t_array, k_array);
+
+	}
+	cout << "average encrypt (clock/byte): " << sumEncTime/(NSAMPLES*8) << endl;
+	cout << "average decrypt (clock/byte): " << sumDecTime/(NSAMPLES*8) << endl;
 
 	return;
 }
 
 void testComp(){
 
-		uint64_t shift = 0x0123456789abcdef;
-		uint8_t * shift_array;
+	uint64_t shift = 0x0123456789abcdef;
+	uint8_t * shift_array;
 
-		shift_array = utin64touint8(shift);
-		cout << "Shift Test:" << endl;
-		printBlock(shift_array);
-		cout << "Shift Result:" << endl;
-		shiftRow(shift_array);
-		printBlock(shift_array);
-		delete [] shift_array;
+	shift_array = utin64touint8(shift);
+	cout << "Shift Test:" << endl;
+	printBlock(shift_array);
+	cout << "Shift Result:" << endl;
+	shiftRow(shift_array);
+	printBlock(shift_array);
+	delete [] shift_array;
 
-		uint64_t rshift = 0x01235674ab89fcde;
-		uint8_t * rshift_array;
+	uint64_t rshift = 0x01235674ab89fcde;
+	uint8_t * rshift_array;
 
-		rshift_array = utin64touint8(rshift);
-		cout << "rShift Test:" << endl;
-		printBlock(rshift_array);
-		cout << "rShift Result:" << endl;
-		rshiftRow(rshift_array);
-		printBlock(rshift_array);
-		delete [] rshift_array;
+	rshift_array = utin64touint8(rshift);
+	cout << "rShift Test:" << endl;
+	printBlock(rshift_array);
+	cout << "rShift Result:" << endl;
+	rshiftRow(rshift_array);
+	printBlock(rshift_array);
+	delete [] rshift_array;
 
-		uint64_t addcon = 0x0000000000000000;
-		uint8_t *addcon_array;
+	uint64_t addcon = 0x0000000000000000;
+	uint8_t *addcon_array;
 
-		addcon_array = utin64touint8(addcon);
-		cout << endl << "Add Constante Test:" << endl;
-		printBlock(addcon_array);
-		cout << "Add Constante Result:" << endl;
-		addConst(addcon_array,4);
-		printBlock(addcon_array);
-		delete [] addcon_array;
+	addcon_array = utin64touint8(addcon);
+	cout << endl << "Add Constante Test:" << endl;
+	printBlock(addcon_array);
+	cout << "Add Constante Result:" << endl;
+	addConst(addcon_array,4);
+	printBlock(addcon_array);
+	delete [] addcon_array;
 
-		uint64_t sub = 0x0123456789abcdef;
-		uint8_t * sub_array;
+	uint64_t sub = 0x0123456789abcdef;
+	uint8_t * sub_array;
 
-		sub_array = utin64touint8(sub);
-		cout << endl << "Sub Test:" << endl;
-		printBlock(sub_array);
-		cout << "Sub Result:" << endl;
-		subCell(sub_array, SBOX);
-		printBlock(sub_array);
-		delete [] sub_array;
+	sub_array = utin64touint8(sub);
+	cout << endl << "Sub Test:" << endl;
+	printBlock(sub_array);
+	cout << "Sub Result:" << endl;
+	subCell(sub_array, SBOX);
+	printBlock(sub_array);
+	delete [] sub_array;
 
-		uint64_t rsub = 0xc56b90ad3ef84712;
-		uint8_t *rsub_array;
+	uint64_t rsub = 0xc56b90ad3ef84712;
+	uint8_t *rsub_array;
 
-		rsub_array = utin64touint8(rsub);
-		cout << "rSub Test:" << endl;
-		printBlock(rsub_array);
-		cout << "rSub Result:" << endl;
-		subCell(rsub_array, INV_SBOX);
-		printBlock(rsub_array);
-		delete [] rsub_array;
+	rsub_array = utin64touint8(rsub);
+	cout << "rSub Test:" << endl;
+	printBlock(rsub_array);
+	cout << "rSub Result:" << endl;
+	subCell(rsub_array, INV_SBOX);
+	printBlock(rsub_array);
+	delete [] rsub_array;
 
-		uint64_t mix = 0xccd43845762ed99d;
-		uint8_t *mix_array;
+	uint64_t mix = 0xccd43845762ed99d;
+	uint8_t *mix_array;
 
-		mix_array = utin64touint8(mix);
-		cout << endl << "Mix Test:" << endl;
-		printBlock(mix_array);
-		cout << "Mix Result:" << endl;
-		mixColumn(mix_array, MIXCOL);
-		printBlock(mix_array);
-		delete [] mix_array;
+	mix_array = utin64touint8(mix);
+	cout << endl << "Mix Test:" << endl;
+	printBlock(mix_array);
+	cout << "Mix Result:" << endl;
+	mixColumn(mix_array, MIXCOL);
+	printBlock(mix_array);
+	delete [] mix_array;
 
-		uint64_t rmix = 0x41228656bea922fb;
-		uint8_t *rmix_array;
+	uint64_t rmix = 0x41228656bea922fb;
+	uint8_t *rmix_array;
 
-		rmix_array = utin64touint8(rmix);
-		cout << "rMix Test:" << endl;
-		printBlock(rmix_array);
-		cout << "rMix Result:" << endl;
-		mixColumn(rmix_array, INV_MIXCOL);
-		printBlock(rmix_array);
-		delete [] rmix_array;
+	rmix_array = utin64touint8(rmix);
+	cout << "rMix Test:" << endl;
+	printBlock(rmix_array);
+	cout << "rMix Result:" << endl;
+	mixColumn(rmix_array, INV_MIXCOL);
+	printBlock(rmix_array);
+	delete [] rmix_array;
 }

@@ -19,10 +19,12 @@ int main (){
 		text_array = utin64touint8(text);
 		key_array = utin64touint8(key);
 
-		encryptBlock(text_array, key_array);
+		double clock = encryptBlock(text_array, key_array);
 
 		cout << "Cypher text:" << endl;
-		cout << hex << uint8touint64(text_array) << endl << endl;
+		cout << hex << uint8touint64(text_array) << endl;
+
+		cout << "Number of clocks: " << clock << endl << endl;
 
 		delete [] text_array;
 		delete [] key_array;
@@ -39,16 +41,20 @@ int main (){
 		text_array = utin64touint8(text);
 		key_array = utin64touint8(key);
 
-		decryptBlock(text_array, key_array);
+		double clock = decryptBlock(text_array, key_array);
 
 		cout << "Cypher text:" << endl;
-		cout << hex << uint8touint64(text_array) << endl << endl;
+		cout << hex << uint8touint64(text_array) << endl;
+
+		cout << "Number of clocks: " << clock << endl << endl;
 
 		delete [] text_array;
 		delete [] key_array;
 
-	}else if(mode == 't'){
+	}else if(mode == 'c'){
 		testComp();
+	}else if(mode == 't'){
+		testTime();
 	}else{
 		cout << ERR_MSG << endl;
 	}
