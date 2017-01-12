@@ -1,3 +1,8 @@
 *.o
 *.so
 led
+/report/*.aux
+/report/*.bbl
+/report/*.log
+/report/*.pdf
+/report/*.blg

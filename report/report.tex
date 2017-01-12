@@ -1,0 +1,249 @@
+
+\documentclass[runningheads,a4paper,11pt]{llncs}
+
+\usepackage{amssymb}
+\setcounter{tocdepth}{3}
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{color}
+\usepackage{enumerate}
+\usepackage{url}
+\usepackage{subfigure}
+\usepackage{multirow}
+\usepackage{amsmath} 
+
+\usepackage{url}
+
+\institute{Intituto de Computação - Unicamp}
+\begin{document}
+
+\title{MC938 - Trabalho 2 Light weight Block Cypher}
+\titlerunning{}
+
+\author{
+	William Tustumi - 120281
+}
+
+\maketitle
+
+\begin{abstract}
+	Esse trabalho \'e um estudo da cifra de bloco LED (Lightweight Encryption Device): o objetivo \'e estudar a efici\^encia e performance em rela\c{c}\~ao a outros algoritmos de mesmo prop\'osito analisar os conhecidos ataques cotra o m\'etodo e entender os seu par\^ametros de seguran\c{c}a.
+	Nesse trabalho foi feita uma implementa\c{c}\~ao em C++ para testar e comparar o desempenho com o c\'odigo refer\^encia.
+\end{abstract}
+
+\section{Descri\c{c}\~ao do Algoritmo}
+
+\subsection{Autores}
+Os autores do artigo de refer\^encia para o m\'etodo s\~ao: Jian Guo, Thomas Peyrin, Axel Poschmann e Matt Robshaw.
+
+\subsection{Descri\c{c}\~ao em alto n\'ivel}
+O m\'etodo \'e baseado na estrutura do AES, delegando o espalhamento e redistribui\c{c}\~ao dos ped\c{c}os da mensagem para as diretivas \textit{MixColumnSerial} e \textit{ShiftRow}. junto com esses m\'etodos tamb\'em s\~ao em pregados as rotinas de \textit{SubCell} e \textit{AddConstant}. A implementa\c{c}\~ao dos quatro m\'etodos seguindo a ordem \textit{AddConst}, \textit{SubCell}, \textit{ShiftRow} and \textit{MixColumnSerial} form\~ao um round da cifragem. Quatro rounds s\~ao denominados um passo no algoritmo, antes de cada passo e ao final do \'ultimo passo o texto \'e cifrado utilizando a chave cim\'etrica. A cifra \'e composta por oito passos para chaves de 64-bits e 12 passos para chaves 128-bits.
+
+\subsection{Descri\c{c}\~ao dos detalhes do algoritmo}
+\textbf{AddConst:} Essa fase da cifragem adiciona \'a mensagem uma constante diferente para cada round do algoritmo. A constante a ser adicionada \'e montada seguindo a Figura \ref{figura:add_const}, onde $s_0 - s_5$ corresponde aos 6 bits das constantes distintas para cada round, $k_0 - k_7$ corresponde a representa\c{c}\~ao bin\'aria do tamanho da chave (e.g $(k_0-k_7)=(01000000)$, para chaves de 64-bits).
+A tabela \ref{tabela:const} mostra as constantes de cada rounde, as constantes tamb\'em podem ser cauculadas movendo um bit para a esquerda e adicionando um bit a direita seguindo a equa\c{c}\~ao $s_0 = 1 \oplus s_5 \oplus s_4$.
+
+\begin{figure}
+	\caption{Constru\c{c}\~ao da matriz de soma de constante.\label{figura:add_const}}
+	\[
+	\begin{pmatrix}
+	\hspace{2mm} 0 \oplus (k_0:k_1:k_2:k_3) \hspace{2mm} & \hspace{2mm} (s_0:s_1:s_2) \hspace{2mm} & \hspace{2mm} 0 \hspace{2mm} & \hspace{2mm} 0 \hspace{2mm} \\
+	0 \oplus (k_0:k_1:k_2:k_3) & (s_3:s_4:s_5) & 0 & 0 \\
+	0 \oplus (k_4:k_5:k_6:k_7) & (s_0:s_1:s_2) & 0 & 0 \\
+	0 \oplus (k_4:k_5:k_6:k_7) & (s_3:s_4:s_5) & 0 & 0 \\
+	
+	\end{pmatrix}
+	\]
+\end{figure}
+
+
+\begin{table}[htbp]
+	\centering
+	\caption{Valores das constantes dependentes do n\'umero do rounde}
+	\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+		\hline
+		Round Number & \multicolumn{8}{|c|}{Const Value} \\ \hline
+		0-7 & \hspace{1mm}0x01\hspace{1mm} &  \hspace{1mm}0x03\hspace{1mm} &  \hspace{1mm}0x07\hspace{1mm} &  \hspace{1mm}0x0f\hspace{1mm} &  \hspace{1mm}0x1f\hspace{1mm} &  \hspace{1mm}0x3e\hspace{1mm} &  \hspace{1mm}0x3d\hspace{1mm} &  \hspace{1mm}0x3b\hspace{1mm} \\ \hline
+		8-15 &   0x37 &  0x2f &  0x1e &  0x3c &  0x39 &  0x33 &  0x27 &  0x0e \\ \hline
+		16-23 &   0x1d &  0x3a &  0x35 &  0x2b &  0x16 &  0x2c &  0x18 &  0x30 \\ \hline
+		14-31 &   0x21 &  0x02 &  0x05 &  0x0b &  0x17 &  0x2e &  0x1c &  0x38 \\ \hline
+	\end{tabular}
+	\label{tabela:const}
+\end{table}
+\noindent
+\textbf{SubCell:} Essa fase simplesmente faz uma substitui\c{c}\~ao entre 4-bits da um bloco da mensagem (chamados de nimbles) por outro valor seguindo a Tabela \ref{tabela:sub}.
+
+\begin{table}[htbp]
+	\centering
+	\caption{tabela da fun\c{c}\~ao de distribui\c{c}\~ao de \textit{SubCell}}
+	\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+		\hline
+		\multicolumn{16}{|c|}{Substitute Cell}\\\hline
+		\hspace{1mm}0\hspace{1mm} & \hspace{1mm}1\hspace{1mm} & \hspace{1mm}2\hspace{1mm} & \hspace{1mm}3\hspace{1mm} & \hspace{1mm}4\hspace{1mm} & \hspace{1mm}5\hspace{1mm} & \hspace{1mm}6\hspace{1mm} & \hspace{1mm}7\hspace{1mm} & \hspace{1mm}8\hspace{1mm} & \hspace{1mm}9\hspace{1mm} & \hspace{1mm}a\hspace{1mm} & \hspace{1mm}b\hspace{1mm} & \hspace{1mm}c\hspace{1mm} & \hspace{1mm}d\hspace{1mm} & \hspace{1mm}e\hspace{1mm} & \hspace{1mm}f\hspace{1mm} \\ \hline
+		c & 5 & 6 & b & 9 & 0 & a & d & 3 & e & f & 8 & 4 & 7 & 1 & 2 \\ \hline
+	\end{tabular}
+	\label{tabela:sub}
+\end{table}
+
+
+\noindent\textbf{ShiftRow:} essa fase rotaciona as linhas do bloco da mensagem em para a esquerda, cada linhas \'e rotacionada 4 bits a mais do que a anterior come\c{c}ando com zero bits na primeira linha. A Figurea \ref{figura:round} ilustra o padr\~ap da rota\c{c}\~ao.
+
+\begin{figure}
+	\centering
+	\caption{Um rounde completo do LED.\label{figura:round}}
+	$\rightarrow$
+	\begin{tabular}{|c|c|c|c|}
+		\multicolumn{4}{c}{\textit{AddConst}}\\\hline
+		$\oplus$&$\oplus$&&\\\hline
+		$\oplus$&$\oplus$&&\\\hline
+		$\oplus$&$\oplus$&&\\\hline
+		$\oplus$&$\oplus$&&\\\hline
+		\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }\\
+	\end{tabular} $\rightarrow$
+	\begin{tabular}{|c|c|c|c|}
+		\multicolumn{4}{c}{\textit{AddConst}}\\\hline
+		$S$&$S$&$S$&$S$\\\hline
+		$S$&$S$&$S$&$S$\\\hline
+		$S$&$S$&$S$&$S$\\\hline
+		$S$&$S$&$S$&$S$\\\hline
+		\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }\\
+	\end{tabular} $\rightarrow$
+	\begin{tabular}{|c|c|c|c|}
+		\multicolumn{4}{c}{\textit{ShiftRow}}\\\hline
+		&&&\\\hline
+		&&&$\leftarrow$\\\hline
+		&&$\leftarrow$&$\leftarrow$\\\hline
+		&$\leftarrow$&$\leftarrow$&$\leftarrow$\\\hline
+		\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }\\
+	\end{tabular} $\rightarrow$
+	\begin{tabular}{|c|c|c|c|}
+		\multicolumn{4}{c}{\textit{ShiftRow}}\\\hline
+		$\wr$&$\wr$&$\wr$&$\wr$\\
+		$\wr$&$\wr$&$\wr$&$\wr$\\
+		$\wr$&$\wr$&$\wr$&$\wr$\\
+		$\wr$&$\wr$&$\wr$&$\wr$\\\hline
+		\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }&\multicolumn{1}{c}{ \hspace{.5cm} }\\
+	\end{tabular} $\rightarrow$
+\end{figure}
+
+\noindent\textbf{MixColumnSerial:} Essa fase multiplica a matrix do texto mensagem pela matriz $M$ da Figura \ref{figura:matriz} na Figura \ref{figura:inv_matriz}, \'e mostrada a matriz $M^{-1}$ utilizada na decrypta\c{c}\~ao, a multiplica\c{c}\~ao \'e sobre $GF(16)$ (Galois Field), a Tabela \ref{tabela:galois} mostra a mutiplica\c{c}\~ao por dois de $0-f$ em hexadecimal. 
+
+\begin{figure}
+	\caption{Matriz utilizada no processo MixColumn.\label{figura:matriz}}
+	\[
+	M = 
+	\begin{pmatrix}
+	0 & 1 & 0 & 0 \\
+	0 & 0 & 1 & 0 \\
+	0 & 0 & 0 & 1 \\
+	4 & 1 & 2 & 2 \\
+	\end{pmatrix}^4
+	=
+	\begin{pmatrix}
+	4 & 1 & 2 & 2 \\
+	8 & 6 & 5 & 6 \\
+	b & e & a & 9 \\
+	2 & 2 & f & b \\
+	\end{pmatrix}
+	\]
+\end{figure}
+
+\begin{figure}
+	\caption{Matriz inversa utilizada no processo de decrypta\c{c}\~ao do MixColumn.\label{figura:inv_matriz}}
+	\[
+	M^{-1}
+	=
+	\begin{pmatrix}
+	c & c & d & 4 \\
+	3 & 8 & 4 & 5 \\
+	7 & 6 & 2 & e \\
+	d & 9 & 9 & d \\
+	\end{pmatrix}
+	\]
+\end{figure}
+
+\begin{table}[htbp]
+	\centering
+	\caption{Resultado de todos os valores poss\'iveis em GF(16) multiplicado por 2}
+	\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+		\hline
+		\multicolumn{16}{|c|}{Galois Filed 16 (x2)} \\ \hline
+		\hspace{1mm}0\hspace{1mm} & \hspace{1mm}1\hspace{1mm} & \hspace{1mm}2\hspace{1mm} & \hspace{1mm}3\hspace{1mm} & \hspace{1mm}4\hspace{1mm} & \hspace{1mm}5\hspace{1mm} & \hspace{1mm}6\hspace{1mm} & \hspace{1mm}7\hspace{1mm} & \hspace{1mm}8\hspace{1mm} & \hspace{1mm}9\hspace{1mm} & \hspace{1mm}a\hspace{1mm} & \hspace{1mm}b\hspace{1mm} & \hspace{1mm}c\hspace{1mm} & \hspace{1mm}d\hspace{1mm} & \hspace{1mm}e\hspace{1mm} & \hspace{1mm}f\hspace{1mm} \\ \hline
+		0 & 2 & 4 & 6 & 8 & a & c & e & 3 & 1 & 7 & 5 & b & 9 & f & d \\ \hline
+	\end{tabular}
+	\label{tabela:galois}
+\end{table}
+
+\noindent\textbf{AddKey:} Essa diretriz basecamente combina a chave e o texto utilizando a opera\c{c}\~ao de XOR. No caso de chaves de 128-bits a diretriz alterna as metades das chaves que s\~ao utilizadas a cada vez, come\c{c}ando da mais significativa.
+
+\noindent\textbf{KeySchedule:} A chave se mantem constante durante todos os passos do algoritmo.
+
+\subsection{Desempenho observado e medido}
+A Tabela  \ref{tabela:referencia_resultados} tem os valores de ciclos por byte utilizado por cada implementa\c{c}\~ao. Podemos ver que o bitslice 32-bits \'e o que obteve o melhor desempenho. Na mesma fonte onde foram encontrados as implementa\c{c}\~oes para o LED tamb\'em tem implementa\c{c}\~oes para os m\'etodos PRESENT e Piccolo, resultados de ciclos por byte tamb\'em situados na mesma tabela.
+
+\begin{table}[htbp]
+	\centering
+	\caption{ciclos por byte medidos de diferentes cifras de bloco.}
+	\begin{tabular}{|c|c|c|c|c|c|}
+		\hline
+		block cipher (key size) & Table & Vperm & Bitslice-8 & Bitslice-16 & Bitslice-32 \\ \hline
+		LED(64) & 56,133 & 37,852 & - & 16,392 & 10,302 \\ \hline
+		Piccolo(80) & 67,689 & 37,881 & - & 9,484 & - \\ \hline
+		PRESENT(80) & 95,449 & 60,878 & 22,656 & 18,983 & - \\ \hline
+		LED(128) & 82,466 & 57,55 & - & 24,074 & 14,382 \\ \hline
+		Piccolo(128) & 84,753 & 47,091 & - & 12,326 & - \\ \hline
+		PRESENT(128) & 89,382 & 58,987 & 23,441 & 19,537 & - \\ \hline
+	\end{tabular}
+	\label{tabela:referencia_resultados}
+\end{table}
+
+Podemos ver que a cifra de bloco LED gatou mais ciclos do que a cifra Piccolo em todos os testes equivalentes exceto quando usado a implementa\c{c}\~ao table, a vantagem do m\'etodo Piccolo decresce um pouco quando comparamos o bitslice-32 do LED (\'unico com essa implementa\c{c}\~ao) com o bitslice-16 do Piccolo, mas ainda continua menos eficiente. A cifra PRESENT foi mais lenta tanto na implementa\c{c}\~ao table como na Vperm, mas ganhou na de bitslice-16, quando comparada com a equivalente do LED, mas \'e um pouco menos eficiente quando considerando o bitslice-32 do LED.
+
+\subsection{An\'alise de Seguran\c{c}a}
+
+\noindent\textbf{Rota\c{c}\~ao de chave:} N\~ao h\'a varia\c{c}\~ao da chave entre os diferentes round da cifra, a seguran\c{c}a \'e garantida a partir da prova do n\'umero m\'inimo de blocos ativos em qualquer passo; essa prova \'e derivara da demosntra\c{c}\~ao de quatro roundes do AES.
+
+\noindent\textbf{Cryptanalise diferencial:} Novamente s\~ao usados o n\'umero de blocos ativos para calcular a probabilidade do processo \textit{Subcell} mapear a differen\c{c}a da entrada para a sa\'ida.
+
+\noindent\textbf{Ataques alg\'ebricos:} A aproxima\c{c}\~ao da fun\c{c}\~ao de embaralhamento do LED mostrou ser aproximada por 10752 equa\c{c}\~oes e 4096 vari\'aveis comparado com as 6400 equa\c{c}\~oes e 2560 vari\'aveis do AES.
+	
+\subsection{Hist\'orico do algoritmo}
+O algoritmo foi proposto em 2011 no artigo "The LED Block Cipher" \cite{Guo2011}, em 2013 o artigo "Key Recovery Attacks on 3-round Even-Mansour, 8-step LED-128, and Full AES" \cite{Dinur2013} expandiu o ataque de 6 roundes para 8 utilizando o m\'etodo de Even-Mansour, que se aproveita da falta de rota\c{c}\~ao de chaves.
+
+\section{Implementa\c{c}\~oes de refer\^encia}
+
+\subsection{Quais e onde est\~ao}
+
+Existem tr\^es implementa\c{c}\~oes refer\^encias em \url{https://github.com/rb-anssi/lightweight-crypto-lib}\footnote{visitado em 6, Dez 2016}: a primeira faz consulta a tabelas pr\'e-calculadas que associam as poss\'iveis entradas as sa\'idas das diretrizes \textit{SubCell}, \textit{ShiftRow} e \textit{MixColumn}; a segunda \'e uma implementa\c{c}\~ao em assembly x86\_64; a \'ultima \'e baseada em bitslice e foi implementada em asm intriscs.
+
+\subsection{Breve compara\c{c}\~ao dos tempos de execu\c{c}\~ao do seu c\'odigo e de uma implementa\c{c}\~ao de refer\^encia}
+
+Na Tabela \ref{tabela:result} podemos ver que  emcrypta\c{c}\~ao \'e equivalente a decrypta\c{c}\~ao em termos consumo de tempo, e na Tabela \ref{tabela:result_comp} podemos ver os resultados comparados com as inmplementa\c{c}\~oes refer\^encia. Como era de se eperar a implementa\c{c}\~ao utilizando C++ teve um desempenho inferior ao c\'odigo baseado em look-up tables (Table) e aos c\'odigos paralelizados (Bitslice-16, bitslice-32 e Vperm).
+
+\begin{table}[htbp]
+	\centering
+	\caption{Clocks por byte medidos na implementa\c{c}\~ao do projeto}
+	\begin{tabular}{|c|c|c|}
+		\hline
+		& Encrypt & Decrypt \\ \hline
+		C++ & 8305,55 & 8353,32 \\ \hline
+	\end{tabular}
+	\label{tabela:result}
+\end{table}
+
+\begin{table}[htbp]
+	\centering
+	\caption{rela\c{c}\~ao de desempenho entre a implementa\c{c}\~ao refer\^encia e a desenvolvida em C++}
+	\begin{tabular}{|c|c|c|c|c|}
+		\hline
+		& Table & Vperm & Bitslice-16 & Bitslice-32 \\ \hline
+		LED(64) & 56,133 & 37,852 & 16,392 & 10,302 \\ \hline
+		C++/reference & 147,9619831472 & 219,4216950227 & 506,6831381162 & 806,207532518 \\ \hline
+	\end{tabular}
+	\label{tabela:result_comp}
+\end{table}
+
+	\bibliographystyle{splncs}
+	\bibliography{library}
+
+\end{document}
